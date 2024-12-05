@@ -1,0 +1,100 @@
+########################GWAS using BOLT-LMM########################
+#!/bin/bash
+#PBS -N Heri_Assoc_PHENO
+#PBS -l nodes=1:ppn=10,mem=48g,walltime=3000:00:00
+#PBS -j oe
+#PBS -q batch
+
+
+./bolt \
+--bed=./ZJ2.8_JS_genotype_merge_for_BOLTLMM.bed \
+--bim=./ZJ2.8_JS_genotype_merge_for_BOLTLMM.bim \
+--fam=./ZJ2.8_JS_genotype_merge_for_BOLTLMM.fam \
+--phenoFile=./Phenotype_ZJ_JS_imaging_39153_low.txt \
+--phenoCol=PHENO \
+--covarFile=./COV_ZJ_JS_imaging_39153.txt \
+--covarCol=sex \
+--covarCol=region \
+--qCovarCol=age \
+--qCovarCol=BMI \
+--qCovarCol=pack_year \
+--qCovarCol=PC{1:10} \
+--LDscoresFile=./LDSCORE.1000G_EAS.tab.gz \
+--geneticMapFile=./genetic_map_hg19.txt.gz \
+--lmmForceNonInf \
+--numThreads=20 \
+--statsFile=./PHENO_assoc.lung.low.bolt.stats.gz \
+--bgenFile=./ZJ2.8_JS_combine_chr{1:22}.1KG.NJMU_BGEN.bgen \
+--sampleFile=./ZJ2.8_JS_combine_chrALL.1KG.NJMU_BGEN.sample \
+--statsFileBgenSnps=./PHENO_assoc.lung.low.imputed.bolt.stats.gz \
+--LDscoresMatchBp \
+--verboseStats
+
+# loop
+for PHENO in $(cat Phenotype_ZJ_JS_imaging_39153_low_NAME.txt)
+do
+    echo $PHENO
+    sed 's/PHENO/'$PHENO'/g' demo_assoc.sh > run_lung_low/Run_scripts_${PHENO}.sh
+done
+
+ls * > ../run_scripts_name
+
+# Batch submit scripts
+for PHENO in $(cat run_scripts_name)
+do
+    echo $PHENO
+    qsub ./run_lung_low/${PHENO}
+done
+
+
+
+##########################################chrX using PLINK#######################################################
+for PHENO in $(cat Phenotype_ZJ_JS_imaging_39153_low_NAME.txt)
+do
+echo $PHENO
+./plink22 \
+    --bpfile ./ZJ2.8_JS_combine_chr23.1KG.NJMU \
+    --pheno ./Phenotype_ZJ_JS_imaging_39153_low.txt \
+    --covar ./COV_ZJ_JS_imaging_39153.txt \
+    --covar-name sex,age,BMI,pack_year,region,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10 \
+    --pheno-name ${PHENO} \
+    --glm hide-covar \
+    --covar-variance-standardize \
+    --out ./${PHENO}_assoc.lung.low.imputed.chrX
+done
+
+
+
+##############################################heritability#######################################################
+
+#!/bin/bash
+#PBS -N Heri_Assoc_PHENO
+#PBS -l nodes=1:ppn=10,mem=48g,walltime=3000:00:00
+#PBS -j oe
+#PBS -q batch
+
+./bolt \
+--bed=./ZJ2.8_JS_genotype_merge_for_BOLTLMM.bed \
+--bim=./ZJ2.8_JS_genotype_merge_for_BOLTLMM.bim \
+--fam=./ZJ2.8_JS_genotype_merge_for_BOLTLMM.fam \
+--phenoFile=./Phenotype_ZJ_JS_imaging_39153_low.txt \
+--phenoCol=PHENO \
+--reml \
+2>&1 | tee ./PHENO_heritability.log
+
+
+# loop
+for PHENO in $(cat Phenotype_ZJ_JS_imaging_39153_low_NAME.txt)
+do
+echo $PHENO
+sed 's/PHENO/'$PHENO'/g' demo_heri.sh > run_lung_low_heri/Run_scripts_Heri_${PHENO}.sh
+done
+
+ls * > ../run_scripts_name_heri
+
+# Batch submit scripts
+for PHENO in $(cat run_scripts_name_heri_50)
+do
+echo $PHENO
+qsub ./run_lung_low_heri/${PHENO}
+done
