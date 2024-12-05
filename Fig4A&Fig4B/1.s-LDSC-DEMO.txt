@@ -1,0 +1,30 @@
+#STEP1: 将gwas summary data转换成sumstats格式
+
+R
+library(data.table)
+dat <- fread('gwas.txt')
+dat1 <- dat[,c('CHR','BP','ALLELE1','ALLELE0','BETA','P_BOLT_LMM','A1FREQ','RSID')]
+names(dat1) <- c('CHR','BP','A1','A2','BETA','P','FRQ','SNP')
+write.table(dat1,file = 'gwas_for_munge.txt',sep = '\t',row.names = F,col.names = T,quote = F)
+
+./ldsc/munge_sumstats.py \
+--sumstats ./gwas_for_munge.txt \
+--N 35469 \
+--chunksize 500000 \
+--out ./gwas
+
+
+# STEP2:运行S-LDSC
+R
+library(data.table)
+kg_ref_dir <- './s_ldsc/' #1kg_ref dir
+pheno <- 'gwas' #.sumstats.gz prefix
+soft_dir <- './software/ldsc/' #ldsc dir
+sumstats_dir <- './sumstats/' #.sumstats.gz dir
+out_dir <- '/data1/qtl/test/' #output dir
+dat <- fread(paste0(kg_ref_dir,'lung_new_EAS.ldcts'),h=F)
+for (i in 1:dim(dat)[1]) {
+  system(paste0('python ',soft_dir,'ldsc.py --h2 ',sumstats_dir,pheno,'.sumstats.gz --ref-ld-chr ./s_ldsc/1000G_Phase3_EAS_baselineLD_v2.2_ldscores/baselineLD.,./s_ldsc/',dat$V2[i],' --frqfile-chr ./s_ldsc/1000G_Phase3_EAS_plinkfiles/1000G.EAS.QC. --print-coefficients --overlap-annot --w-ld-chr ./s_ldsc/1000G_Phase3_EAS_weights_hm3_no_MHC/weights.EAS.hm3_noMHC. --out ',out_dir,pheno,'_',dat$V1[i])) 
+}
+
+

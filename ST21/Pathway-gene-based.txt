@@ -1,0 +1,51 @@
+#data prepare#
+# ./Lung_Imaging
+for pheno in $(cat file_name)
+do
+awk -OF'\t' 'BEGIN {print "SNP","P"} NR>1 {print $1,$2}'  ${pheno} > ../${pheno}_pre_magma
+done
+
+
+
+
+########################################################################################
+#prepare for magma#
+awk -OF'\t' '{print $18,$2,$3,$11,$8}' firstorder_minP.txt > firstorder_minP_pre
+awk -OF'\t' '{print $18,$2,$3,$11,$8}' shape_minP.txt > shape_minP_pre
+########################################################################################
+#magma:gene-set###
+./magma --snp-loc Lung_Imaging/firstorder_minP_pre --gene-loc NCBI37.3.gene.loc --annotate window=5,5 --out Lung_Imaging/Lung_Imaging_ANNOTE_5
+
+
+for pheno in $(cat file_name)
+do
+./magma --bfile REF_G1000/g1000_eas --pval Lung_Imaging/${pheno}_pre_magma N=35456 --gene-annot Lung_Imaging/Lung_Imaging_ANNOTE_5.genes.annot --out Lung_Imaging/${pheno}_5 --gene-model snp-wise
+done
+
+
+
+
+#结果整理#
+R
+library("data.table")
+file_name <- read.table("file_name",h=T)
+gwas_dir <- "/data/data/Gene-based/Lung_Imaging/5K"
+
+phenoname=file_name$file[1]
+gwama <- fread(sprintf("%s/%s_5.genes.out",gwas_dir,phenoname))
+gene=fread("/data/data/Gene-based/NCBI37.3.gene.loc")
+gwama1=merge(gwama,gene,by.x=c("GENE"),by.y=c("V1"))
+gwama1$Pheno <- phenoname
+
+for (file in 2:nrow(file_name))
+{
+phenoname=file_name$file[file]
+gwama <- fread(sprintf("%s/%s_5.genes.out",gwas_dir,phenoname))
+gwama=merge(gwama,gene,by.x=c("GENE"),by.y=c("V1"))
+gwama$Pheno <- phenoname
+gwama1 <- rbind(gwama1,gwama)
+rm(gwama)
+}
+
+write.csv(gwama1,"GWAMA_5KB_results_combine.csv",row.names=F)
+write.csv(data,"GWAMA_5KB_results_combine_sig.csv",row.names=F)
